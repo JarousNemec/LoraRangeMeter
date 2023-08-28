@@ -20,6 +20,9 @@ void setup() {
     server.begin();
     Serial.println("HTTP server started");
 
+    pinMode(PIN_SUCCESS_LED, OUTPUT);
+    pinMode(PIN_SEND_LED, OUTPUT);
+
     //Load configuration
     LoadConfiguration();
 }
@@ -34,7 +37,30 @@ void loop() {
         }
     }
     BehaveByStationType();
+    ShineControl();
     jBuffer.clear();
+}
+
+void ShineControl() {
+    if ((millis() - shine_send_time) > LED_TIMEOUT) {
+        digitalWrite(PIN_SEND_LED, LOW);
+        shine_send_time = 0;
+    }
+
+    if ((millis() - shine_success_time) > LED_TIMEOUT) {
+        digitalWrite(PIN_SUCCESS_LED, LOW);
+        shine_success_time = 0;
+    }
+}
+
+void ShineSend() {
+    shine_send_time = millis();
+    digitalWrite(PIN_SEND_LED, HIGH);
+}
+
+void ShineSuccess() {
+    shine_success_time = millis();
+    digitalWrite(PIN_SUCCESS_LED, HIGH);
 }
 
 void BehaveByStationType() {
@@ -101,6 +127,7 @@ void SendPacket(PacketType type, String content, String source, String destinati
     PacketToSend.printTo(output);
     ESerial.print(output);
     PrintPacketStructure(&PacketToSend);
+    ShineSend();
 }
 
 void ProcessPacket(JsonObject *pckt) {
@@ -118,7 +145,7 @@ void ProcessPing(JsonObject *pckt) {
     auto type = (PacketType) pckt->get<int>("t");
     switch (type) {
         case Syn:
-            if(destination == StationConfig.Id){
+            if (destination == StationConfig.Id) {
                 SendPacket(PacketType::SynAck, "Ping", StationConfig.Id, source);
                 PingStatus.PingSent = true;
                 PingStatus.PingSentTo = source;
@@ -133,6 +160,7 @@ void ProcessPing(JsonObject *pckt) {
                 PingStatus.PingSentWhen = 0;
                 PingStatus.PingSentTo = "all";
                 SendPacket(PacketType::Ack, "Ping", StationConfig.Id, source);
+                ShineSuccess();
             }
             break;
         case Ack:
@@ -142,6 +170,7 @@ void ProcessPing(JsonObject *pckt) {
                 PingStatus.PingSent = false;
                 PingStatus.PingSentWhen = 0;
                 PingStatus.PingSentTo = "all";
+                ShineSuccess();
             }
             break;
     }
@@ -170,12 +199,14 @@ void ProcessDiscoverBeacon(JsonObject *pckt) {
                 BeaconDiscoverStatus.DiscoverSentWhen = 0;
                 BeaconDiscoverStatus.DiscoverTarget = "all";
                 SendPacket(PacketType::Ack, "DiscB", StationConfig.Id, source);
+                ShineSuccess();
             }
             break;
         case Ack:
             if (StationConfig.Type == Beacon && source == BeaconDiscoverStatus.DiscoverTarget &&
                 BeaconDiscoverStatus.DiscoverSent) {
                 Serial.println("Beacon successfully discovered new station!");
+                ShineSuccess();
             }
             break;
     }
@@ -195,21 +226,25 @@ String SendHTML() {
                  "<body>\n"
                  "<h3>Actual set Id: " + String(StationConfig.Id) + "</h3>\n"
                                                                     "<h3>Actual set Type: " +
-                 String(GetStationTypeFromEnum())
-                 +
-                 "</h3><br>\n"
-                 "<form action=\"/\" method=\"post\">\n"
-                 "    <label for=\"id\">ID:</label>\n"
-                 "    <input type=\"text\" id=\"id\" name=\"id\" value=\""+String(StationConfig.Id)+"\"><br>\n"
-                 "    <label>Type:</label>\n"
-                 "    <input type=\"radio\" id=\"beacon\" name=\"type\" value=\"Beacon\"><label for=\"beacon\" "+(StationConfig.Type == Beacon ?"checked" :"")+" >Beacon</label>\n"
-                 "    <input type=\"radio\" id=\"fieldStation\" name=\"type\" value=\"FieldStation\" "+(StationConfig.Type == FieldStation ?"checked" :"")+" ><label for=\"fieldStation\">FieldStation</label>\n"
-                 "    <input type=\"radio\" id=\"bridge\" name=\"type\" value=\"Bridge\"><label for=\"bridge\" "+(StationConfig.Type == Bridge ?"checked" :"")+" >Bridge</label>\n"
-                 "    <input type=\"radio\" id=\"pinger\" name=\"type\" value=\"Pinger\"><label for=\"pinger\" "+(StationConfig.Type == Pinger ?"checked" :"")+" >Pinger</label><br><br>\n"
-                 "    <input type=\"submit\" value=\"Submit\">"
-                 "</form>\n"
-                 "</body>\n"
-                 "</html>";
+                 String(GetStationTypeFromEnum()) + "</h3><br>\n"
+                                                    "<form action=\"/\" method=\"post\">\n"
+                                                    "    <label for=\"id\">ID:</label>\n"
+                                                    "    <input type=\"text\" id=\"id\" name=\"id\" value=\"" +
+                 String(StationConfig.Id) + "\"><br>\n"
+                                            "    <label>Type:</label>\n"
+                                            "    <input type=\"radio\" id=\"beacon\" name=\"type\" value=\"Beacon\"><label for=\"beacon\" " +
+                 (StationConfig.Type == Beacon ? "checked" : "") + " >Beacon</label>\n"
+                                                                   "    <input type=\"radio\" id=\"fieldStation\" name=\"type\" value=\"FieldStation\" " +
+                 (StationConfig.Type == FieldStation ? "checked" : "") +
+                 " ><label for=\"fieldStation\">FieldStation</label>\n"
+                 "    <input type=\"radio\" id=\"bridge\" name=\"type\" value=\"Bridge\"><label for=\"bridge\" " +
+                 (StationConfig.Type == Bridge ? "checked" : "") + " >Bridge</label>\n"
+                                                                   "    <input type=\"radio\" id=\"pinger\" name=\"type\" value=\"Pinger\"><label for=\"pinger\" " +
+                 (StationConfig.Type == Pinger ? "checked" : "") + " >Pinger</label><br><br>\n"
+                                                                   "    <input type=\"submit\" value=\"Submit\">"
+                                                                   "</form>\n"
+                                                                   "</body>\n"
+                                                                   "</html>";
     return ptr;
 }
 

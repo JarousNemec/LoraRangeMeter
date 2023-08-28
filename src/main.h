@@ -96,7 +96,7 @@ void BehaveByStationType();
 
 void BehaveAsPinger();
 
-void SendPacket(PacketType type, String content, String source, String destination);
+void SendPacket(PacketType type, const String& content, const String& source, const String& destination);
 
 void ProcessDiscoverBeacon(JsonObject *pckt);
 

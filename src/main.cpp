@@ -117,7 +117,7 @@ void PrintPacketStructure(JsonObject *pckt) {
     Serial.println((pckt->get<String>("d")));
 }
 
-void SendPacket(PacketType type, String content, String source, String destination) {
+void SendPacket(PacketType type, const String& content, const String& source, const String& destination) {
     JsonObject &PacketToSend = jBuffer.createObject();
     PacketToSend["t"] = (int) type;
     PacketToSend["c"] = content;
